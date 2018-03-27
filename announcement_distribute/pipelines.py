@@ -5,26 +5,36 @@
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
 
-from . import settings
+
 import pymysql
 import pymongo
 import logging
 
-class AnnouncementDistributePipeline(object):
-    def process_item(self, item, spider):
-        return item
-
 
 class MysqlPipeline(object):
-    def __init__(self):
-        self.mysql_host = settings.db_host
-        self.mysql_user = settings.db_user
-        self.mysql_password = settings.db_pwd
-        self.mysql_db = settings.db_dbname
-        self.mysql_tb = settings.db_table
+    """insert data to mysql"""
 
+    def __init__(self, db_host, db_user, db_pwd, db_dbname, db_table):
+        """init mysql parameter"""
+
+        self.mysql_host = db_host
+        self.mysql_user = db_user
+        self.mysql_password = db_pwd
+        self.mysql_db = db_dbname
+        self.mysql_tb = db_table
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        """get mysql para from settings file """
+
+        return cls(db_host=crawler.settings.get('DB_HOST'),
+                   db_user=crawler.settings.get('DB_USER'),
+                   db_pwd=crawler.settings.get('DB_PWD'),
+                   db_dbname=crawler.settings.get('DB_DBNAME'),
+                   db_table=crawler.settings.get('DB_TABLE'))
 
     def open_spider(self, spider):
+        """open spider and connect mysql"""
         self.conn = pymysql.connect(
                                     host=self.mysql_host,
                                     user=self.mysql_user,
@@ -35,7 +45,8 @@ class MysqlPipeline(object):
                                     )
 
     def process_item(self, item, spider):
-        cur = self.conn.cursor()
+        """insert item data to mysql"""
+
         pdf_id = item['pdf_id']
         stock_code = item['stock_code']
         market = item['market']
@@ -45,21 +56,30 @@ class MysqlPipeline(object):
         pdf_link = item['pdf_link']
         is_tranformed = item['is_tranformed']
         try:
-            sql = 'insert into {0} (`pdf_id`,`stock_code`,`market`,`crawl_time`,`announce_time`,`announce_title`,`pdf_link`,`is_tranformed`) values ' \
-                  '(%s,%s,%s,%s,%s,%s,%s,%s)'.format(self.mysql_tb)
-            cur.execute(sql, (pdf_id, stock_code, market, crawl_time, announce_time, announce_title, pdf_link, is_tranformed))
-            logging.info(sql)
-            logging.info('++++++++++++insert into success+++++++++++++')
+            with self.conn.cursor() as cur:
+                sql = 'insert into {0} (`pdf_id`,`stock_code`,`market`,`crawl_time`,`announce_time`,`announce_title`,' \
+                      '`pdf_link`,`is_tranformed`) values (%s,%s,%s,%s,%s,%s,%s,%s)'.format(self.mysql_tb)
+                cur.execute(sql, (pdf_id, stock_code, market, crawl_time, announce_time, announce_title,
+                                  pdf_link, is_tranformed))
+                logging.info(sql)
+                logging.info('++++++++++++insert into success+++++++++++++')
         except Exception as e:
             logging.error('---------insert error--------:{0}'.format(e))
         return item
 
     def close_spider(self, spider):
-        self.conn.commit()
-        self.conn.close()
+        """commit data to mysql and close connect"""
+        try:
+            self.conn.commit()
+            logging.info('++++++commit success++++')
+        except Exception as e:
+            logging.error('-----commit faild------')
+        finally:
+            self.conn.close()
 
 
 class MongoPipeline(object):
+    """you can choose mongodb to save data then you must config the settings file (config ITEM_PIPELINES)"""
     collection_name = 'users'
 
     def __init__(self, mongo_uri, mongo_db):

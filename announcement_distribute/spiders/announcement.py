@@ -1,31 +1,37 @@
 # _*_coding:utf8 _*_
 
-import scrapy
+
 import json
 import datetime
 import os
 import copy
 import logging
 import time
+
+import scrapy
+from .. import settings
 from ..items import AnnouncementDistributeItem
 from ..pdf2txt import pdf2txt
 from ..settings import PDFPATH
-
 from scrapy.spidermiddlewares.httperror import HttpError
 from twisted.internet.error import DNSLookupError
 from twisted.internet.error import TimeoutError, TCPTimedOutError
 
-logging.basicConfig(filename='annouce.log', level=logging.ERROR,
+logging.basicConfig(filename='annouce.log', level=logging.INFO,
                     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 
 class announcement(scrapy.Spider):
+    """a class to crawl list company's announcement which include sh and sz"""
+
     name = 'announcement_distribute'
 
     def start_requests(self):
+        """start metheod you can assign your start url"""
+
         url = 'http://www.cninfo.com.cn/cninfo-new/announcement/query?{0}'.format(int(time.time()))
-        start_date = '2017-01-01'
-        end_date = '2017-09-02'
+        start_date = settings.START_DATE
+        end_date = settings.END_DATE
         data = {
             'plate': 'shmb;sz;szmb;szzx;szcy;',
             'column': 'szse',
@@ -36,19 +42,22 @@ class announcement(scrapy.Spider):
             'showTitle': 'shmb/plate/沪市主板;sz/plate/深市公司;szmb/plate/深市主板;szzx/plate/中小板;szcy/plate/创业板',
             'seDate': '{0} ~ {1}'.format(start_date, end_date)
         }
-        yield scrapy.FormRequest(url=url, formdata=data, meta={'data': data},callback=self.parse)
+        yield scrapy.FormRequest(url=url, formdata=data, meta={'data': data}, callback=self.parse)
 
     def parse(self, response):
+        """a metheod to parse the announcement messege about the title,stock_code,
+        announcetime...and transfor the pdf to txt file"""
+
         item2 = AnnouncementDistributeItem()
         js = json.loads(response.text)
         conlist = js['announcements']
         AllNum = js['totalRecordNum']
-        #path = '/home/he/wudang_share/hezudao/distribute'
         path = PDFPATH
         for i in conlist:
             link = i['adjunctUrl']
             _date = datetime.date.fromtimestamp(int(i['announcementTime'])/1000).strftime('%Y-%m-%d')
-            announcementTime = datetime.datetime.fromtimestamp(int(i['announcementTime'])/1000).strftime('%Y-%m-%d %H:%M:%S')
+            announcementTime = datetime.datetime.fromtimestamp(int(i['announcementTime'])/1000).\
+                strftime('%Y-%m-%d %H:%M:%S')
             pdf_id = link.split('/')[-1]
             stock_code = i['secCode']
             if stock_code.startswith('60'):
@@ -85,17 +94,13 @@ class announcement(scrapy.Spider):
                 yield request
 
         data = response.meta.get('data')
-        print data
         pagenum = int(data['pageNum'])
         tag = divmod(int(AllNum), 30)
         if tag[1] != 0:
             totalpage = tag[0] + 1
         else:
             totalpage = tag[0]
-        print '***************************************************'
-        print pagenum,totalpage
         logging.info('pagenum:{0},totalpage:{1}'.format(pagenum, totalpage))
-        print '****************************************************'
         if pagenum < totalpage:
             pagenum = pagenum + 1
             data = data
@@ -105,6 +110,8 @@ class announcement(scrapy.Spider):
                                      formdata=data, callback=self.parse)
 
     def download_pdf(self, response):
+        """a metheod download pdf file from the web to the appoint path"""
+
         logging.info('download pdf')
         item2 = response.meta['item2']
         filename = response.meta.get('filename')
@@ -123,6 +130,7 @@ class announcement(scrapy.Spider):
         yield item2
 
     def errback_httpbin(self, failure):
+        """a metheod to fetch error when download faild include httperror,timeouterror,dnserror"""
         # log all failures
         self.logger.error(repr(failure))
         # in case you want to do something special for some errors,

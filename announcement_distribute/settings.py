@@ -102,14 +102,18 @@ REDIS_URL = 'redis://root:password@host:6379'
 SCHEDULER_IDLE_BEFORE_CLOSE = 200
 
 #mysql
-db_host = ''
-db_user = ''
-db_pwd = ''
-db_dbname = ''
-db_table = ''
+DB_HOST = ''
+DB_USER = ''
+DB_PWD = ''
+DB_DBNAME = ''
+DB_TABLE = ''
 
 #mongo
 MONGO_URI = ''
 MONGO_DATABASE = ''
 
-PDFPATH = '' #PDF存储路径
+PDFPATH = './' #PDF存储路径
+
+#announcement start_date and end_date
+START_DATE = '2017-01-01'
+END_DATE = '2017-12-31'

@@ -4,7 +4,7 @@ import signal
 import os
 import logging
 
-from cStringIO import StringIO
+from io import StringIO
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
@@ -15,6 +15,7 @@ class TimeOutException(Exception):
     pass
 
 def setTimeout(num):
+    """a decorator appoint transform timeout"""
     def wrape(func):
         def handle(signum, frame):
             raise TimeOutException("PDF解析超时！")
@@ -35,6 +36,7 @@ def setTimeout(num):
 
 @setTimeout(60)
 def pdf2txt(path):
+    """pdf transform to txt"""
     ret = 10
     rsrcmgr = PDFResourceManager()
     retstr = StringIO()
